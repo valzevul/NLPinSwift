@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<playground version='6.0' target-platform='macos'>
+    <pages>
+        <page name='1-Dominant+Language'/>
+        <page name='2-Lemmatization'/>
+        <page name='3-Tokenizing'/>
+        <page name='4-PoS'/>
+        <page name='5-NER'/>
+        <page name='TF-IDF'/>
+        <page name='Similar+Words'/>
+        <page name='Sentiment+Analysis'/>
+    </pages>
+</playground>
