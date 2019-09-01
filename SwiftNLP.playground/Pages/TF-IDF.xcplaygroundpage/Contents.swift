@@ -1,6 +1,8 @@
 import Foundation
 import NaturalLanguage
 
+var useLemmas = false
+
 let schemes: [NLTagScheme] = [.language, .lemma, .lexicalClass, .nameType]
 let tagger = NLTagger(tagSchemes: schemes)
 let options: NLTagger.Options = [.joinNames, .omitWhitespace]
@@ -11,6 +13,9 @@ let article = "Aberystwyth is a university town and tourist destination, and for
 let stopwords = ["a", "", "share", "linkthese", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any","are","aren't","as","at","be","because","been","before","being","below","between","both","but","by","can't","cannot","could","couldn't","did","didn't","do","does","doesn't","doing","don't","down","during","each","few","for","from","further","had","hadn't","has","hasn't","have","haven't","having","he","he'd","he'll","he's","her","here","here's","hers","herself","him","himself","his","how","how's","i","i'd","i'll","i'm","i've","if","in","into","is","isn't","it","it's","its","itself","let's","me","more","most","mustn't","my","myself","no","nor","not","of","off","on","once","only","or","other","ought","our","ours","ourselves","out","over","own","same","shan't","she","she'd","she'll","she's","should","shouldn't","so","some","such","than","that","that's","the","their","theirs","them","themselves","then","there","there's","these","they","they'd","they'll","they're","they've","this","those","through","to","too","under","until","up","very","was","wasn't","we","we'd","we'll","we're","we've","were","weren't","what","what's","when","when's","where","where's","which","while","who","who's","whom","why","why's","with","won't","would","wouldn't","you","you'd","you'll","you're","you've","your","yours","yourself","yourselves", "this"]
 
 func tokenize(text: String, for unit: NLTokenUnit) -> [String] {
+  if unit == .word && useLemmas {
+    return lemmatization(for: text)
+  }
   let tokenizer = NLTokenizer(unit: unit)
   tokenizer.string = text
   var tokensArray = [String]()
@@ -30,6 +35,20 @@ func prettify(article: String) -> [String] {
   return tokenize(text: article, for: .word).filter { str -> Bool in
     !stopwords.contains(str) && str.count > 2
   }
+}
+
+func lemmatization(for text: String) -> [String] {
+  tagger.string = text
+  var results = [String]()
+  let range = text.startIndex..<text.endIndex
+  tagger.enumerateTags(in: range, unit: .word, scheme: .lemma,
+                       options: options) { (tag, range) -> Bool in
+                        if let lemma = tag?.rawValue {
+                          results.append(lemma)
+                        }
+                        return true
+  }
+  return results
 }
 
 let allWords = prettify(article: article.lowercased())
@@ -105,3 +124,6 @@ let sorted = tfidf.sorted { (lhr, rhr) -> Bool in
   return lhr.value > rhr.value
 }
 print(sorted[0], sorted[1], sorted[2])
+
+// (key: "Aberystwyth is a university town and tourist destination, and forms a cultural link between North Wales and South Wales. ", value: 0.014382807375465158) (key: "Public bodies located in the town include the National Library of Wales, which incorporates the National Screen and Sound Archive of Wales, one of six British regional film archives. ", value: 0.012330745129263243) (key: "The Royal Commission on the Ancient and Historical Monuments of Wales maintains and curates the National Monuments Record of Wales (NMRW), providing the public with information about the built heritage of Wales. ", value: 0.011409833035370024)
+
