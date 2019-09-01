@@ -1,8 +1,6 @@
 import Foundation
 import NaturalLanguage
 
-var useLemmas = false
-
 let schemes: [NLTagScheme] = [.language, .lemma, .lexicalClass, .nameType]
 let tagger = NLTagger(tagSchemes: schemes)
 let options: NLTagger.Options = [.joinNames, .omitWhitespace]
@@ -12,21 +10,19 @@ let article = "Aberystwyth is a university town and tourist destination, and for
 
 let stopwords = ["a", "", "share", "linkthese", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any","are","aren't","as","at","be","because","been","before","being","below","between","both","but","by","can't","cannot","could","couldn't","did","didn't","do","does","doesn't","doing","don't","down","during","each","few","for","from","further","had","hadn't","has","hasn't","have","haven't","having","he","he'd","he'll","he's","her","here","here's","hers","herself","him","himself","his","how","how's","i","i'd","i'll","i'm","i've","if","in","into","is","isn't","it","it's","its","itself","let's","me","more","most","mustn't","my","myself","no","nor","not","of","off","on","once","only","or","other","ought","our","ours","ourselves","out","over","own","same","shan't","she","she'd","she'll","she's","should","shouldn't","so","some","such","than","that","that's","the","their","theirs","them","themselves","then","there","there's","these","they","they'd","they'll","they're","they've","this","those","through","to","too","under","until","up","very","was","wasn't","we","we'd","we'll","we're","we've","were","weren't","what","what's","when","when's","where","where's","which","while","who","who's","whom","why","why's","with","won't","would","wouldn't","you","you'd","you'll","you're","you've","your","yours","yourself","yourselves", "this"]
 
+// From previous lessons
 func tokenize(text: String, for unit: NLTokenUnit) -> [String] {
-  if unit == .word && useLemmas {
-    return lemmatization(for: text)
-  }
   let tokenizer = NLTokenizer(unit: unit)
   tokenizer.string = text
   var tokensArray = [String]()
-  let tokens = tokenizer.tokens(for: text.startIndex..<text.endIndex)
-  for token in tokens {
-    let x = String(text[token])
-    tokensArray.append(x)
+  let range = text.startIndex..<text.endIndex
+  for token in tokenizer.tokens(for: range) {
+    tokensArray.append(String(text[token]))
   }
   return tokensArray
 }
 
+// New code
 func uniqueWords(words: [String]) -> [String] {
   return Array(Set(words))
 }
@@ -37,93 +33,75 @@ func prettify(article: String) -> [String] {
   }
 }
 
-func lemmatization(for text: String) -> [String] {
-  tagger.string = text
-  var results = [String]()
-  let range = text.startIndex..<text.endIndex
-  tagger.enumerateTags(in: range, unit: .word, scheme: .lemma,
-                       options: options) { (tag, range) -> Bool in
-                        if let lemma = tag?.rawValue {
-                          results.append(lemma)
-                        }
-                        return true
+func countWords(words: [String]) -> [String: Double] {
+  var results = [String: Double]()
+  let uniqueW = uniqueWords(words: words)
+  for word in words {
+    if uniqueW.contains(word) {
+      results[word] = (results[word] ?? 0) + 1
+    }
   }
   return results
 }
 
 let allWords = prettify(article: article.lowercased())
+let allSentences = tokenize(text: article, for: .sentence)
+let allUniqueWords = uniqueWords(words: allWords)
+var allUniqueWordsFrequency = countWords(words: allWords)
 
-func countWords(words: [String]) -> [String: Double] {
-  var results = [String: Double]()
-  let uniqueW = uniqueWords(words: words)
-  for word in uniqueW {
-    results[word] = 0
-    for w in allWords {
-      if word.lowercased() == w.lowercased() {
-        results[word] = (results[word] ?? 0) + 1
-      }
+func countForSentences(sentences: [String], values: [String: Double]) -> [String: Double] {
+  var sentenceFrequences = [String: Double]()
+  for sentence in sentences {
+    var sum = 0.0
+    let sentenceWords = prettify(article: sentence.lowercased())
+    for word in sentenceWords {
+      sum += (values[word.lowercased()] ?? 0)
     }
+    sentenceFrequences[sentence] = sum / Double(sentenceWords.count)
   }
-  return results
+  return sentenceFrequences
 }
 
 func termFrequency() -> [String: Double] {
-  var tfVals = countWords(words: allWords)
-  for key in tfVals.keys {
-    tfVals[key] = (tfVals[key] ?? 0.0) / Double(allWords.count)
+  var currentFrequency = [String: Double]()
+  for word in allUniqueWordsFrequency.keys {
+    currentFrequency[word] = (allUniqueWordsFrequency[word] ?? 0.0) / Double(allWords.count)
   }
-  
-  var tfSentences = [String: Double]()
-  let sentences = tokenize(text: article, for: .sentence)
-  for sentence in sentences {
-    var value = 0.0
-    let sentenceWords = prettify(article: sentence)
-    for word in sentenceWords {
-      value += (tfVals[word.lowercased()] ?? 0)
-    }
-    tfSentences[sentence] = value / Double(sentenceWords.count)
-  }
-  return tfSentences
+  return countForSentences(sentences: allSentences,
+                           values: currentFrequency)
 }
 
 func inverseDocumentFrequence() -> [String: Double] {
-  var tfVals = countWords(words: allWords)
-  let uniqueW = uniqueWords(words: allWords)
-  let sentences = tokenize(text: article, for: .sentence)
-  var IDFVals = [String: Double]()
-  
-  for word in uniqueW {
-    let wordInSentencesCount = tfVals[word] ?? 0.0
-    IDFVals[word] = log10(Double(sentences.count) / wordInSentencesCount)
+  var inverseFrequency = [String: Double]()
+  for word in allUniqueWordsFrequency.keys {
+    inverseFrequency[word] = log10(Double(allSentences.count) / (allUniqueWordsFrequency[word] ?? 0.0))
   }
-  
-  var tfSentences = [String: Double]()
-  for sentence in sentences {
-    var value = 0.0
-    let sentenceWords = prettify(article: sentence)
-    for word in sentenceWords {
-      value += (IDFVals[word.lowercased()] ?? 0)
-    }
-    tfSentences[sentence] = value / Double(sentenceWords.count)
-  }
-  return tfSentences
+  return countForSentences(sentences: allSentences,
+                           values: inverseFrequency)
 }
 
 func TFIDF() -> [String: Double] {
   let tf = termFrequency()
   let idf = inverseDocumentFrequence()
-  var tFidf = [String: Double]()
+  var tfidf = [String: Double]()
   for word in tf.keys {
-    tFidf[word] = (tf[word] ?? 0) * (idf[word] ?? 0)
+    guard let tf = tf[word], let idf = idf[word] else { continue }
+    tfidf[word] = tf * idf
   }
-  return tFidf
+  return tfidf
 }
 
-let tfidf = TFIDF()
-let sorted = tfidf.sorted { (lhr, rhr) -> Bool in
+let sortedResults = TFIDF().sorted { (lhr, rhr) -> Bool in
   return lhr.value > rhr.value
 }
-print(sorted[0], sorted[1], sorted[2])
 
-// (key: "Aberystwyth is a university town and tourist destination, and forms a cultural link between North Wales and South Wales. ", value: 0.014382807375465158) (key: "Public bodies located in the town include the National Library of Wales, which incorporates the National Screen and Sound Archive of Wales, one of six British regional film archives. ", value: 0.012330745129263243) (key: "The Royal Commission on the Ancient and Historical Monuments of Wales maintains and curates the National Monuments Record of Wales (NMRW), providing the public with information about the built heritage of Wales. ", value: 0.011409833035370024)
+print(sortedResults[0])
+print(sortedResults[1])
+print(sortedResults[2])
+
+
+// (key: "Aberystwyth is a university town and tourist destination, and forms a cultural link between North Wales and South Wales. ", value: 0.014382807375465158)
+// (key: "The town is the unofficial capital of Mid Wales, and several institutions have regional or national offices there. ", value: 0.013139647594908592)
+// (key: "The Royal Commission on the Ancient and Historical Monuments of Wales maintains and curates the National Monuments Record of Wales (NMRW), providing the public with information about the built heritage of Wales. ", value: 0.012642474277418311)
+
 
